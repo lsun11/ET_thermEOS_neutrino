@@ -1,0 +1,119 @@
+/********************************
+ * Setup piecewise polytropes
+ * 
+ * Written in June 2016 by Elias R. Most  
+ * <emost@th.physik.uni-frankfurt.de>
+ *
+ * Sets up parameters for piecewiese 
+ * polytropes in IllinoisGRMHD.
+ *
+ * We do things here as in Whisky_Exp
+ * (See Takami et al. https://arxiv.org/pdf/1412.3240v2.pdf)
+ * (also see Read et al. https://arxiv.org/pdf/0812.2163v1.pdf)
+ ********************************/
+
+#include <math.h>
+#include "cctk.h"
+#include "cctk_Parameters.h"
+#include "cctk_Arguments.h"
+#include "IllinoisGRMHD_headers.h"
+
+static constexpr CCTK_REAL c_sq=8.9875517873681764e+20;
+static constexpr CCTK_REAL rho_nuc=6.1771669179018705e+17;
+
+
+extern "C" void setup_piecewise_polytrope(CCTK_ARGUMENTS){
+
+  DECLARE_CCTK_ARGUMENTS;
+  DECLARE_CCTK_PARAMETERS;
+
+  //Unit system
+  CCTK_REAL rho_unit=1.0;
+  CCTK_REAL K_unit=1.0;
+
+  igm_eos_parameters eos;
+  initialize_igm_eos_parameters_from_input(igm_eos_key,cctk_time,eos);
+  
+  if(!CCTK_EQUALS(Units,"cactus")){
+	if(CCTK_EQUALS(Units,"cgs")){
+		rho_unit=1.0/rho_nuc;
+		K_unit=pow(rho_nuc,Gamma_EOS[0]-1.0)/c_sq;
+	}
+	else{
+		if(CCTK_EQUALS(Units,"cgs_cgs_over_c2")){
+			rho_unit=1.0/rho_nuc;
+			K_unit=pow(rho_nuc,Gamma_EOS[0]-1.0);
+		}
+		else{
+			CCTK_WARN(CCTK_WARN_ABORT,"Unit system not recognised!");
+		}
+	}
+  }
+  	
+ CCTK_VInfo(CCTK_THORNSTRING, "Setting up piecewise polytrope");
+  
+  eos.k_tab[0]=K_unit*K_EOS;
+  eos.gamma_tab[0]=Gamma_EOS[0];  
+  eos.rho_tab[0]=0.0;
+  eos.eps_tab[0]=0.0;
+  eos.P_tab[0]=0.0;
+  
+
+  //Setup piecewise polytrope	
+  if (ergo_star == 0){
+    for(int i=1;i<neos;++i){
+	//Consistency check
+	if(Rho_EOS[i]<=Rho_EOS[i-1])
+		CCTK_WARN(CCTK_WARN_ABORT,"Rho_EOS must increase monotonically!");
+
+	eos.gamma_tab[i]=Gamma_EOS[i];
+        eos.rho_tab[i]= rho_unit*Rho_EOS[i];
+        eos.k_tab[i]=eos.k_tab[i-1]*pow(eos.rho_tab[i],eos.gamma_tab[i-1]-eos.gamma_tab[i]);
+
+	eos.eps_tab[i]=eos.eps_tab[i-1]
+		  +eos.k_tab[i-1]*pow(eos.rho_tab[i],eos.gamma_tab[i-1]-1.0)/(eos.gamma_tab[i-1]-1.0)
+		  -eos.k_tab[i]*pow(eos.rho_tab[i],eos.gamma_tab[i]-1.0)/(eos.gamma_tab[i]-1.0);
+	eos.P_tab[i]=eos.k_tab[i]*pow(eos.rho_tab[i],eos.gamma_tab[i]);
+    }
+  
+    for(int nn=0;nn<neos;++nn){
+      CCTK_VInfo(CCTK_THORNSTRING, "nn= %d : K=%.15e , rho= %.15e, gamma= %.15e, eps= %.15e, P=.%15e ", nn, eos.k_tab[nn], eos.rho_tab[nn], eos.gamma_tab[nn], eos.eps_tab[nn], eos.P_tab[nn]);
+    }
+  }
+  else{
+    for(int i=1;i<neos;++i){
+      eos.gamma_tab[i]=Gamma_EOS[i];
+      eos.rho_tab[i]= rho_unit*Rho_EOS[i];
+      eos.k_tab[i]=eos.k_tab[i-1]*pow(eos.rho_tab[i],eos.gamma_tab[i-1]-eos.gamma_tab[i]);
+
+      //eos.eps_tab[i]=eos.eps_tab[i-1]
+      //	-eos.k_tab[i-1]*pow(eos.rho_tab[i-1],eos.gamma_tab[i-1]-1.0)/(eos.gamma_tab[i-1]-1.0)
+      //	+eos.k_tab[i]*pow(eos.rho_tab[i],eos.gamma_tab[i]-1.0)/(eos.gamma_tab[i]-1.0);
+      eos.P_tab[i]=eos.k_tab[i]*pow(eos.rho_tab[i],eos.gamma_tab[i]);
+      if (eos.P_tab[i-1]*eos.rho_tab[i-1]==0){
+	eos.eps_tab[i] = eos.eps_tab[i-1] + (eos.P_tab[i]/eos.rho_tab[i])/(eos.gamma_tab[i]-1.0);
+      }
+      else{
+	eos.eps_tab[i] = eos.eps_tab[i-1] + (eos.P_tab[i]/eos.rho_tab[i]-eos.P_tab[i-1]/eos.rho_tab[i-1])/(eos.gamma_tab[i]-1.0);
+      }
+    }
+    eos.gamma_tab[neos]=Gamma_EOS[neos];
+    eos.rho_tab[neos]= rho_unit*Rho_EOS[neos];
+    eos.k_tab[neos] = Kqc_EOS; //For cocal data manually define the k(kappa) in-quark core part.
+    eos.P_tab[neos] = Pqc_EOS; //Forcocal data manually define the pressure in-quark core part.
+    eos.eps_tab[neos] = eos.eps_tab[neos-1]+ (eos.P_tab[neos]/eos.rho_tab[neos]-eos.P_tab[neos-1]/eos.rho_tab[neos-1])/(eos.gamma_tab[neos]-1.0);
+    //    eos.eps_tab[neos] = eos.eps_tab[neos-1]
+    //  -eos.k_tab[neos-1]*pow(eos.rho_tab[neos-1],eos.gamma_tab[neos-1]-1.0)/(eos.gamma_tab[neos-1]-1.0)
+    //  +eos.k_tab[neos]*pow(eos.rho_tab[neos],eos.gamma_tab[neos]-1.0)/(eos.gamma_tab[neos]-1.0);
+    
+  for(int nn=0;nn<neos+1;++nn){
+     CCTK_VInfo(CCTK_THORNSTRING, "nn= %d : K=%.15e , rho= %.15e, gamma= %.15e, eps= %.15e, P=%.15e ", nn, eos.k_tab[nn], eos.rho_tab[nn], eos.gamma_tab[nn], eos.eps_tab[nn], eos.P_tab[nn]);     
+  }
+
+  }
+  CCTK_VInfo(CCTK_THORNSTRING, "ergo_star = %d: ergo_sigma =%.15e ", ergo_star, ergo_sigma);
+
+
+  return;
+
+}

@@ -1,0 +1,5 @@
+            2  rhoini_cgsV     : nphase, rhoini_cgs
+  dividingRHO  dividingPRE     : rho_0, pre_0
+  1.00000d+17  gamma_val_1     : rho, gamma
+  dividingRHO  gamma_val_2     : rho, gamma
+  1.00000d+00  gamma_val_2     : rho, gamma

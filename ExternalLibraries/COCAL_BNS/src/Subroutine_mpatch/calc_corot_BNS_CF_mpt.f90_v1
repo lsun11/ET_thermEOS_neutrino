@@ -1,0 +1,101 @@
+subroutine calc_corot_BNS_CF_mpt(total_iteration)
+  use phys_constant, only  : long, nmpt
+  use def_quantities
+  use def_matter_parameter
+  use def_matter_parameter_mpt
+  implicit none
+  real(long) :: xa,xb,fa,fb,eps,delta,f1,f2
+  integer :: total_iteration, iter_count, i, icycle, Nmax=50
+  integer :: impt
+  eps = 1.0d-06
+  total_iteration = 0
+!
+  call iter_corot_BNS_CF_mpt(iter_count,1)     !  1 for freezing hydro in first 5 iterations
+  total_iteration = total_iteration + iter_count
+  write(6,'(a21,i5)') '--- total iteration =', total_iteration
+  call calc_physical_quantities_BNS_CF_mpt   
+  call save_solution_BNS_mpt(0)
+  call copy_def_matter_parameter_from_mpt(1)
+  xa = emdc
+  call copy_def_quantities_from_mpt(1)
+  fa = (restmass - restmass_sph)/restmass_sph
+  write(6,*)  "xa,fa=", xa, fa,  "           restmass, restmass_sph = ", restmass, restmass_sph
+!
+  xb = xa - 0.25d0*xa
+  do impt = 1, 2
+    call copy_def_matter_parameter_from_mpt(impt)
+    emdc = xb
+    call copy_def_matter_parameter_to_mpt(impt)
+  end do
+  write(6,'(a14,1p,2e20.12)')  "emdc COCP1,2: ", def_matter_param_real_(2,1), def_matter_param_real_(2,2)
+  call iter_corot_BNS_CF_mpt(iter_count,2)     ! 2 to compute hydro from first iteration
+  total_iteration = total_iteration + iter_count
+  write(6,'(a21,i5)') '--- total iteration =', total_iteration
+  call calc_physical_quantities_BNS_CF_mpt
+  call save_solution_BNS_mpt(1)
+  call copy_def_quantities_from_mpt(1)
+  fb = (restmass - restmass_sph)/restmass_sph
+  write(6,*)  "xb,fb=", xb, fb,  "           restmass, restmass_sph = ", restmass, restmass_sph
+!
+  write(6,*) '--------- Initial values for emdc and f(emdc)=(restmass - restmass_sph)/restmass_sph ---------------------------'
+  write(6,'(a7,i2,1p,2e20.12)') 'cycle =',0,xa,fa
+  write(6,'(a7,i2,1p,2e20.12)') 'cycle =',1,xb,fb
+!
+  if ( dabs(fa)>dabs(fb) ) then  ! interchange xa,xb  and fa,fb
+    f1 = xa
+    xa = xb
+    xb = f1
+
+    f1 = fa
+    fa = fb
+    fb = f1
+  endif
+!
+  icycle = 1
+  do i = 2,Nmax
+    icycle = icycle + 1
+    if ( dabs(fa)>dabs(fb) ) then
+      f1 = xa
+      xa = xb
+      xb = f1
+      f1 = fa
+      fa = fb
+      fb = f1
+    end if
+    delta = (xb-xa)/(fb-fa)
+    xb = xa
+    fb = fa
+    delta = delta*fa
+    if ( dabs(delta) < eps ) then
+      write(6,*) 'Convergence...'
+      call copy_def_matter_parameter_from_mpt(1)
+      write(6,*) '------------------------------------------------------------------'
+      write(6,*) 'Central Emden = ',emdc
+!      call printout_physq_console_BBH
+      return
+    end if
+    if (i.lt.10) then
+      xa = xa - i*delta/10.0d0
+    else
+      xa = xa - delta
+    end if 
+    do impt = 1, 2
+      call copy_def_matter_parameter_from_mpt(impt)
+      emdc = xa
+      call copy_def_matter_parameter_to_mpt(impt)
+    end do
+    write(6,'(a14,1p,2e20.12)')  "emdc COCP1,2: ", def_matter_param_real_(2,1), def_matter_param_real_(2,2)
+    write(6,*) '------------------------------------------------------------------'
+    write (6,'(a7,i2,a20,e20.12)') 'cycle =', icycle, '        New emdc  = ',emdc
+    call iter_corot_BNS_CF_mpt(iter_count,icycle)
+    total_iteration = total_iteration + iter_count
+    write(6,'(a21,i5)') '--- total iteration =', total_iteration
+    call calc_physical_quantities_BNS_CF_mpt
+    call save_solution_BNS_mpt(icycle)
+    call copy_def_quantities_from_mpt(1)
+    fa = (restmass - restmass_sph)/restmass_sph
+    write(6,'(a7,i2,1p,2e20.12)')  'cycle =',icycle,xa,fa
+  end do
+  write(6,*) 'No convergence after ',Nmax,' iterations.'
+
+end subroutine calc_corot_BNS_CF_mpt

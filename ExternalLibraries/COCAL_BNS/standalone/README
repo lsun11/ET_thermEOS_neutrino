@@ -1,0 +1,53 @@
+"Cocal_orig" is the directory that comes from the standalone code and
+***SHOULD NOT*** be modified.
+
+==> Every time a new version of COCAL/COCAL_READER comes out we put it in the
+    directory "standalone" as "Cocal_orig".
+    The script "cidar_create.sh" should work on the "Cocal_orig" directory
+    and produce the "Cocal" directory which will be used for the reader.
+
+==> Also if we want to simulate different systems we should modify the flag in
+    the "cidar_create.sh", and then ***RERUN*** this script in order to
+    create the correct "Cocal" directory for reading ID.
+
+
+#######################################################################
+
+==> Script "cidar_bns_standalone_test.sh" can work either on "Cocal" directory
+    or in "Cocal_orig" directory.
+
+==> If we want to test the standalone reader run 'sh cidar_bns_standalone_test.sh'. 
+    It requires the input of a coordinate like: 10 0 0
+    and outputs at that point the field variables
+
+#######################################################################
+Cocal variables:
+
+rho  : rest mass density
+ene  : energy density
+pre  : pressure
+h    : specific enthalpy
+emd  : Emden function P/rho (exported in COCAL ID)
+vep  : velocity potential   (exported in COCAL ID)
+rs   : neutron star surface (exported in COCAL ID)
+
+psi  : conformal factor     (exported in COCAL ID)
+alph : lapse function       (exported in COCAL ID)
+bvxd : x-component of shift (exported in COCAL ID)
+bvyd : y-component of shift (exported in COCAL ID)
+bvzd : z-component of shift (exported in COCAL ID)
+
+Files for Irrotational BNS Initial Data:
+3-d data files:
+bnsflu_3D_mpt1.las  => COCP-1 : emd, vep
+bnsflu_3D_mpt2.las  => COCP-2 : emd, vep
+bnsgra_3D_mpt1.las  => COCP-1 : psi, alph, bvxd, bvyd, bvzd 
+bnsgra_3D_mpt2.las  => COCP-2 : psi, alph, bvxd, bvyd, bvzd 
+bnsgra_3D_mpt3.las  => ARCP   : psi, alph, bvxd, bvyd, bvzd 
+2-d data files:
+bnssur_3D_mpt1.las  => COCP-1 : rs
+bnssur_3D_mpt2.las  => COCP-2 : rs
+Also exported are three real numbers
+ome  : orbital angular velocity
+ber  : Constant of Euler integral
+radi : Max radius of neutron star

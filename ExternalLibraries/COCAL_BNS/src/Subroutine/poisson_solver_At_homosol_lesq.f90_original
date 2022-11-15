@@ -1,0 +1,199 @@
+subroutine poisson_solver_At_homosol_lesq(pot_bc,pot_nb,pot_surf)
+  use phys_constant, only :  long
+  use grid_parameter, only : nrg, ntg, npg, nlg
+  use coordinate_grav_r,     only : rg, hrg
+  use coordinate_grav_theta, only : thg, hthg
+  use coordinate_grav_phi,   only : phig, hphig
+  use trigonometry_grav_theta, only : hcosecthg
+  use trigonometry_grav_phi, only : cosmpg, sinmpg, hsinmpg, hcosmpg
+  use legendre_fn_grav, only : yplmg, hyplmg, hdtyplmg
+  use def_matter, only : rs
+  use make_array_1d
+  use make_array_2d
+  use interface_interpo_lag4th_2Dsurf
+  use interface_minv
+  implicit none
+  real(long), pointer :: pot_bc(:,:), pot_nb(:,:), pot_surf(:,:,:)
+  real(long), pointer :: alm(:,:), blm(:,:), pot_bcmnb(:,:)
+  real(long), pointer :: fnc(:,:), hrs(:,:)
+  real(long), pointer :: sgg(:), gg(:,:)
+  real(long) :: hrsc, flm, fllmm, surf, val, tv, pv
+  integer    :: ir, it, ip, nbou, imm, ivec, im, ill, il, ieqs
+  integer    :: ii, jj
+!
+! - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+! Coefficients of homogeneous solution is computed.
+! - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+!
+  call alloc_array2d(alm,0,nlg,0,nlg)
+  call alloc_array2d(blm,0,nlg,0,nlg)
+  call alloc_array2d(pot_bcmnb,1,ntg,1,npg)
+  call alloc_array2d(fnc,0,ntg,0,npg)
+  call alloc_array2d(hrs,0,ntg,0,npg)
+  nbou = (nlg+1)*(nlg+1)
+  call alloc_array1d(sgg,1,nbou+1)
+  call alloc_array2d(gg,1,nbou+1,1,nbou+1)
+!
+  sgg(1:nbou+1) = 0.0d0
+   gg(1:nbou+1,1:nbou+1) = 0.0d0
+  alm(0:nlg,0:nlg) = 0.0d0
+  blm(0:nlg,0:nlg) = 0.0d0
+!
+  fnc(0:ntg,0:npg) = pot_bc(0:ntg,0:npg) - pot_nb(0:ntg,0:npg)
+  do ip = 1, npg
+    do it = 1, ntg
+      tv = hthg(it)
+      pv = hphig(ip)
+      call interpo_lag4th_2Dsurf(val,fnc,tv,pv)
+      pot_bcmnb(it,ip) = val
+      call interpo_lag4th_2Dsurf(val,rs,tv,pv)
+      hrs(it,ip) = val
+    end do
+  end do
+! --- Boundary equations are solved.
+!
+  ieqs = 0
+  do il = 0, nlg
+    do im = 0, il
+      ieqs = ieqs + 1
+!
+      do ip = 1, npg
+        do it = 1, ntg
+!
+          hrsc = hrs(it,ip)
+          flm = hrsc**(-il-1)*hyplmg(il,im,it)*hcosmpg(im,ip)
+          sgg(ieqs) = sgg(ieqs) + pot_bcmnb(it,ip)*flm
+!
+          ivec = 0
+          do ill = 0, nlg
+            do imm = 0, ill
+              ivec = ivec + 1
+              fllmm = hrsc**(-ill-1)*hyplmg(ill,imm,it)*hcosmpg(imm,ip)
+              gg(ieqs,ivec) = gg(ieqs,ivec) + fllmm*flm
+            end do
+          end do
+          do ill = 1, nlg
+            do imm = 1, ill
+              ivec = ivec + 1
+              fllmm = hrsc**(-ill-1)*hyplmg(ill,imm,it)*hsinmpg(imm,ip)
+              gg(ieqs,ivec) = gg(ieqs,ivec) + fllmm*flm
+            end do
+          end do
+!
+        end do
+      end do
+!
+    end do
+  end do
+!
+  do il = 1, nlg
+    do im = 1, il
+      ieqs = ieqs + 1
+!
+      do ip = 1, npg
+        do it = 1, ntg
+!
+          hrsc = hrs(it,ip)
+          flm = hrsc**(-il-1)*hyplmg(il,im,it)*hsinmpg(im,ip)
+          sgg(ieqs) = sgg(ieqs) + pot_bcmnb(it,ip)*flm
+!
+          ivec = 0
+          do ill = 0, nlg
+            do imm = 0, ill
+              ivec = ivec + 1
+              fllmm = hrsc**(-ill-1)*hyplmg(ill,imm,it)*hcosmpg(imm,ip)
+              gg(ieqs,ivec) = gg(ieqs,ivec) + fllmm*flm
+            end do
+          end do
+          do ill = 1, nlg
+            do imm = 1, ill
+              ivec = ivec + 1
+              fllmm = hrsc**(-ill-1)*hyplmg(ill,imm,it)*hsinmpg(imm,ip)
+              gg(ieqs,ivec) = gg(ieqs,ivec) + fllmm*flm
+            end do
+          end do
+!
+        end do
+      end do
+!
+    end do
+  end do
+!
+  if(ivec.ne.nbou) write(6,*) ' harmonic ivec wrong ', ivec, nbou
+  if(ieqs.ne.nbou) write(6,*) ' harmonic ieqs wrong ', ieqs, nbou
+!
+!
+!  do ii=1,5
+!    do jj=1,5
+!      write(6,*) gg(ii,jj)
+!    end  do
+!  end do
+!
+!  do ii=1,5
+!    write(6,*)  "*************", sgg(ii)
+!  end do
+
+  call minv(gg,sgg,nbou,nbou+1)
+!
+!  do ii=1,5
+!    write(6,*)  nbou, sgg(ii)
+!  end do
+!
+  ieqs = 0
+  do il = 0, nlg
+    do im = 0, il
+      ieqs = ieqs + 1
+      alm(il,im) = sgg(ieqs)
+    end do
+  end do
+  do il = 1, nlg
+    do im = 1, il
+      ieqs = ieqs + 1
+      blm(il,im) = sgg(ieqs)
+    end do
+  end do
+  if(ieqs.ne.nbou) write(6,*) ' harmonic alm blm wrong ', ieqs, nbou
+
+!
+! --  calculate homogeneous part.
+!
+  pot_surf(0:nrg,0:ntg,0:npg) = 0.0d0
+  blm(0:nlg,0) = 0.0d0
+  do ip = 0, npg
+    do it = 0, ntg
+      do ir = 1, nrg
+!
+        surf = 0.0d0
+        do il = 0, nlg
+          do im = 0, il
+            surf = surf + alm(il,im)*rg(ir)**(-il-1)*   &
+            &             yplmg(il,im,it)*cosmpg(im,ip) &
+            &           + blm(il,im)*rg(ir)**(-il-1)*   &
+            &             yplmg(il,im,it)*sinmpg(im,ip) 
+         end do
+        end do
+!
+        pot_surf(ir,it,ip) = surf
+        if (rg(ir).lt.rs(it,ip)) pot_surf(ir,it,ip) = 0.0d0
+!
+      end do
+    end do
+  end do
+
+!
+!  if (iter.eq.itmx) then
+!    do 141 il = 1, nlg
+!      do 141 im = 2-mod(il,2), il, 2
+!      write(24,*)il,im,alm(il,im)
+! 141  continue
+!      end if
+!
+  deallocate(alm)
+  deallocate(blm)
+  deallocate(pot_bcmnb)
+  deallocate(fnc)
+  deallocate(hrs)
+  deallocate(sgg)
+  deallocate(gg)
+!
+end subroutine poisson_solver_At_homosol_lesq

@@ -1,0 +1,2 @@
+  DR            DROT___value   : ROT_LAW(-> DR diff.rot) DROT_ratio
+  index_DR_val  A2DR___value   : index_DR, A2DR

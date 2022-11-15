@@ -1,0 +1,110 @@
+subroutine current_modify_MHD(cobj)
+  use phys_constant, only  : long, pi
+  use grid_parameter
+  use coordinate_grav_r, only : rg
+  use trigonometry_grav_phi, only   : sinphig, cosphig
+  use def_metric, only : alph, psi
+  use def_metric_hij, only : hxxu, hxyu, hxzu, hyyu, hyzu, hzzu
+  use def_matter, only : rs
+  use def_emfield, only : vaxd, vayd, vazd, jtu, jxu, jyu, jzu
+  use def_faraday_tensor, only : fxd_grid, fyd_grid, fzd_grid
+  use def_vector_phi, only : vec_phig
+  use integrability_fnc_MHD
+  use make_array_3d
+  use interface_interpo_gr2fl
+  use interface_grgrad_gridpoint_4th_type0
+  implicit none
+  real(long), pointer :: vaphid(:,:,:)
+  real(long), pointer :: p6fxu(:,:,:), p6fyu(:,:,:), p6fzu(:,:,:)
+  real(long) :: vecphi(3)
+  real(long) :: dfxudx, dfxudy, dfxudz
+  real(long) :: dfyudx, dfyudy, dfyudz
+  real(long) :: dfzudx, dfzudy, dfzudz
+  real(long) :: alps6inv, pi4inv, jphiu
+  integer    :: irg, itg, ipg
+  character(len=2), intent(in) :: cobj
+!
+  call alloc_array3d(vaphid, 0, nrg, 0, ntg, 0, npg)
+  call alloc_array3d(p6fxu, 0, nrg, 0, ntg, 0, npg)
+  call alloc_array3d(p6fyu, 0, nrg, 0, ntg, 0, npg)
+  call alloc_array3d(p6fzu, 0, nrg, 0, ntg, 0, npg)
+!
+  vaphid(0:nrg,0:ntg,0:npg)=vayd(0:nrg,0:ntg,0:npg) &
+  &                    *vec_phig(0:nrg,0:ntg,0:npg,2)
+  p6fxu(0:nrg,0:ntg,0:npg) = psi(0:nrg,0:ntg,0:npg)**10 &
+  &  *((1.0d0 + hxxu(0:nrg,0:ntg,0:npg))*fxd_grid(0:nrg,0:ntg,0:npg) &
+  &           + hxyu(0:nrg,0:ntg,0:npg) *fyd_grid(0:nrg,0:ntg,0:npg) &
+  &           + hxzu(0:nrg,0:ntg,0:npg) *fzd_grid(0:nrg,0:ntg,0:npg))
+  p6fyu(0:nrg,0:ntg,0:npg) = psi(0:nrg,0:ntg,0:npg)**10 &
+  &           *(hxyu(0:nrg,0:ntg,0:npg) *fxd_grid(0:nrg,0:ntg,0:npg) &
+  &  + (1.0d0 + hyyu(0:nrg,0:ntg,0:npg))*fyd_grid(0:nrg,0:ntg,0:npg) &
+  &           + hyzu(0:nrg,0:ntg,0:npg) *fzd_grid(0:nrg,0:ntg,0:npg))
+  p6fzu(0:nrg,0:ntg,0:npg) = psi(0:nrg,0:ntg,0:npg)**10 &
+  &           *(hxzu(0:nrg,0:ntg,0:npg) *fxd_grid(0:nrg,0:ntg,0:npg) &
+  &           + hyzu(0:nrg,0:ntg,0:npg) *fyd_grid(0:nrg,0:ntg,0:npg) &
+  &  + (1.0d0 + hzzu(0:nrg,0:ntg,0:npg))*fzd_grid(0:nrg,0:ntg,0:npg))
+!
+! Solve on phi=0 plane
+  pi4inv = 1.0d0/(4.0d0*pi)
+  ipg = 0
+  do itg = 0, ntg
+    do irg = 0, nrg
+!
+      vecphi(1)= vec_phig(irg,itg,ipg,1)
+      vecphi(2)= vec_phig(irg,itg,ipg,2)
+      vecphi(3)= vec_phig(irg,itg,ipg,3)
+      alps6inv = 1.0d0/(alph(irg,itg,ipg)*psi(irg,itg,ipg)**6)
+      call grgrad_gridpoint_4th_type0(p6fxu,dfxudx,dfxudy,dfxudz,&
+      &                                     irg,itg,ipg,cobj)
+      call grgrad_gridpoint_4th_type0(p6fyu,dfyudx,dfyudy,dfyudz,&
+      &                                     irg,itg,ipg,cobj)
+      call grgrad_gridpoint_4th_type0(p6fzu,dfzudx,dfzudy,dfzudz,&
+      &                                     irg,itg,ipg,cobj)
+! jt 
+      jtu(irg,itg,ipg) = pi4inv*alps6inv*(dfxudx + dfyudy +dfzudz)
+! modify jphi 
+      if (irg.eq.0.or.itg.eq.0) then 
+        jphiu = 0.0d0 
+      else 
+        jphiu = jyu(irg,itg,ipg)/vecphi(2) - MHDfnc_dAt*jtu(irg,itg,ipg)
+      end if
+! jy 
+      jyu(irg,itg,ipg) = jphiu*vecphi(2)
+! no wind
+      if (rg(irg).gt.rs(itg,ipg)) then 
+        jtu(irg,itg,ipg) = 0.0d0
+        jyu(irg,itg,ipg) = 0.0d0
+      end if
+!
+    end do
+  end do
+!
+! Copy to phi /= 0 planes.
+!
+  do ipg = 0, npg
+    do itg = 0, ntg
+      do irg = 0, nrg
+        jtu(irg,itg,ipg) = jtu(irg,itg,0)
+        jxu(irg,itg,ipg) = cosphig(ipg)*jxu(irg,itg,0) &
+        &                - sinphig(ipg)*jyu(irg,itg,0)
+        jyu(irg,itg,ipg) = sinphig(ipg)*jxu(irg,itg,0) &
+        &                + cosphig(ipg)*jyu(irg,itg,0)
+        jzu(irg,itg,ipg) = jzu(irg,itg,0)
+! no wind
+      if (rg(irg).gt.rs(itg,ipg)) then 
+        jtu(irg,itg,ipg) = 0.0d0
+        jxu(irg,itg,ipg) = 0.0d0
+        jyu(irg,itg,ipg) = 0.0d0
+        jzu(irg,itg,ipg) = 0.0d0
+      end if
+!
+      end do
+    end do
+  end do
+!
+  deallocate(vaphid)
+  deallocate(p6fxu)
+  deallocate(p6fyu)
+  deallocate(p6fzu)
+!
+end subroutine current_modify_MHD

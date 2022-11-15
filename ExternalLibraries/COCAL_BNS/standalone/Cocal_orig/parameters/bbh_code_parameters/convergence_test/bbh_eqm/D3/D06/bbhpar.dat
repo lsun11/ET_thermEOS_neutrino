@@ -1,0 +1,4 @@
+  8.000000E-02  0.000000E-01   : ome_bh, spin_bh
+  1.000000E-01  3.000000E-00   : alph_bh, psi_bh
+  0.000000E-00  0.000000E-00   : th_spin_bh_deg, phi_spin_bh_deg
+  AH                           : bh_bctype

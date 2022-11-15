@@ -1,0 +1,56 @@
+!  weight for numerical integration using mid-point rule
+!______________________________________________
+module weight_midpoint_fluid_sphcoord
+  use phys_constant, only : long
+  implicit none
+! weight binary excision
+  real(long), pointer :: hwrtpg_fc(:,:,:)
+  real(long), pointer :: hwtpg_fc(:,:)
+!
+contains
+!
+subroutine allocate_weight_midpoint_fluid_sphcoord
+  use grid_parameter, only : nrf, ntg, npg 
+  use make_array_2d
+  use make_array_3d
+  implicit none
+  call alloc_array3d(hwrtpg_fc,1,nrf,1,ntg,1,npg)
+  call alloc_array2d(hwtpg_fc,1,ntg,1,npg)
+end subroutine allocate_weight_midpoint_fluid_sphcoord
+!
+subroutine calc_weight_midpoint_fluid_sphcoord
+  use grid_parameter,       only : nrf, ntg, npg 
+  use coordinate_grav_r,    only : rg, hrg
+  use weight_midpoint_grav, only : hwdrg, hwdtg, hwdpg
+  use def_matter,           only : rs
+  use interface_interpo_linear_type0_2Dsurf
+  implicit none
+  real(long) :: wgr, wgt, wgp, rrff
+  integer :: irg, itg, ipg
+!
+! --  weight of integlation for volume integral in GR coordinate, 
+! --  with modified weight for the stellar surface
+!
+!  hwrtpg_fc(:,:,:) = 0.0d0
+  hwrtpg_fc = 0.0d0
+  write(6,*) "ffffffffffffffffffffff", hwrtpg_fc(1,1,1)
+
+  do ipg = 1, npg
+    do itg = 1, ntg
+      call interpo_linear_type0_2Dsurf(rrff,rs,itg,ipg)
+      do irg = 1, nrf
+        wgr = hwdrg(irg)
+        wgt = hwdtg(itg)
+        wgp = hwdpg(ipg)
+        hwrtpg_fc(irg,itg,ipg) = wgr*wgt*wgp
+        if (hrg(irg+1).gt.rrff*rg(nrf)) then
+          wgr = hrg(irg)**2*(rrff*rg(nrf) - rg(irg-1))
+          hwrtpg_fc(irg,itg,ipg) = wgr*wgt*wgp
+          exit
+        end if
+      end do
+    end do
+  end do
+!
+end subroutine calc_weight_midpoint_fluid_sphcoord
+end module weight_midpoint_fluid_sphcoord

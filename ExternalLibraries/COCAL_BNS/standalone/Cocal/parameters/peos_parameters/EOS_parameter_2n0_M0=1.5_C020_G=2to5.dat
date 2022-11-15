@@ -1,0 +1,44 @@
+Parameters for polytrope with Gamma = 2 to 5 
+with restmass M0 = 1.5 M_sol at M/R = 0.2
+
+# Gamma = 2.0
+ad_gamma1=2.00000d+00
+ad_gamma2=2.00000d+00
+rho_div=5.60000e+14
+pre_div=3.24059e+34
+
+# Gamma = 2.5
+ad_gamma1=2.50000d+00
+ad_gamma2=2.50000d+00
+rho_div=5.60000e+14
+pre_div=2.37538e+34
+
+# Gamma = 3.0
+ad_gamma1=3.00000d+00
+ad_gamma2=3.00000d+00
+rho_div=5.60000e+14
+pre_div=1.98103e+34
+
+# Gamma = 3.5
+ad_gamma1=3.50000d+00
+ad_gamma2=3.50000d+00
+rho_div=5.60000e+14
+pre_div=1.70955e+34
+
+# Gamma = 4.0
+ad_gamma1=4.00000d+00
+ad_gamma2=4.00000d+00
+rho_div=5.60000e+14
+pre_div=1.49641e+34
+
+# Gamma = 4.5
+ad_gamma1=4.50000d+00
+ad_gamma2=4.50000d+00
+rho_div=5.60000e+14
+pre_div=1.31942e+34
+
+# Gamma = 5.0
+ad_gamma1=5.00000d+00
+ad_gamma2=5.00000d+00
+rho_div=5.60000e+14
+pre_div=1.16828e+34

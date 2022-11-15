@@ -1,0 +1,51 @@
+subroutine source_MoC_WL_EMF(souvec,sou)
+  use grid_parameter, only : nrg, ntg, npg, nrf, ntf, npf
+  use interface_sourceterm_MoC_CF
+  use interface_sourceterm_MoC_WL
+  use interface_sourceterm_MoC_WL_EMF
+  use interface_sourceterm_MoC_WL_SEM
+  use def_vector_x, only : hvec_xg
+  use make_array_3d
+  use make_array_4d
+  implicit none
+  real(8), pointer :: sou(:,:,:), souvec(:,:,:,:)
+  real(8), pointer :: souvec1(:,:,:,:), souvec2(:,:,:,:)
+  real(8), pointer :: souvec3(:,:,:,:), souvec4(:,:,:,:)
+  real(8) :: xxx, yyy, zzz
+  integer :: ipg, itg, irg
+  character(len=1) :: chgra
+!
+  call alloc_array4d(souvec1,0,nrg,0,ntg,0,npg,1,3)
+  call alloc_array4d(souvec2,0,nrg,0,ntg,0,npg,1,3)
+  call alloc_array4d(souvec3,0,nrg,0,ntg,0,npg,1,3)
+  call alloc_array4d(souvec4,0,nrg,0,ntg,0,npg,1,3)
+!
+  call sourceterm_MoC_CF(souvec1)
+  call sourceterm_MoC_WL(souvec2)
+  call sourceterm_MoC_WL_EMF(souvec3)
+  call sourceterm_MoC_WL_SEM(souvec4)
+  souvec(0:nrg,0:ntg,0:npg,1:3) = souvec1(0:nrg,0:ntg,0:npg,1:3) &
+  &                             + souvec2(0:nrg,0:ntg,0:npg,1:3) &
+  &                             + souvec3(0:nrg,0:ntg,0:npg,1:3) &
+  &                             + souvec4(0:nrg,0:ntg,0:npg,1:3)
+!
+  sou(0:nrg,0:ntg,0:npg) = 0.0d0
+  do ipg = 1, npg
+    do itg = 1, ntg
+      do irg = 1, nrg
+        xxx = hvec_xg(irg,itg,ipg,1)
+        yyy = hvec_xg(irg,itg,ipg,2)
+        zzz = hvec_xg(irg,itg,ipg,3)
+        sou(irg,itg,ipg) = xxx*souvec(irg,itg,ipg,1) &
+        &                + yyy*souvec(irg,itg,ipg,2) &
+        &                + zzz*souvec(irg,itg,ipg,3)
+      end do
+    end do
+  end do
+!
+  deallocate(souvec1)
+  deallocate(souvec2)
+  deallocate(souvec3)
+  deallocate(souvec4)
+!
+end subroutine source_MoC_WL_EMF
